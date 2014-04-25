@@ -14,12 +14,12 @@
 #include "Effects.h"
 #include "SimpleAudioEngine.h"
 #include "Enemies.h"
-
+#include "Player.h"
+#include "HelloWorldScene.h"
 Node* BulletController::_bulletLayer = nullptr;
 bool BulletController::_inited = false;
 Vector<Bullet*> BulletController::bullets;
 Vector<Missile*> BulletController::_missilePool;
-
 
 
 void BulletController::reset(){
@@ -52,9 +52,9 @@ Bullet* BulletController::spawnBullet(int type, Point pos, Point vec)
             {
                 // if the pool is not empty, we don't need to create, just return that, and reset its data
                 bullet = _missilePool.back();
-                bullet->retain();
+                //bullet->retain();
                 _missilePool.popBack();
-
+                
                 //bullet->reset();
             }
             else
@@ -64,11 +64,15 @@ Bullet* BulletController::spawnBullet(int type, Point pos, Point vec)
             }
             //bullet->setType
             break;
+        case kEnemyBullet:
+            bullet = Bullet::create();
+            bullet->setType(kEnemyBullet);
+            break;
     }
     if(bullet)
     {
         bullets.pushBack(bullet);
-        _bulletLayer->addChild(bullet);
+        _bulletLayer->addChild(bullet,1);
         //bullet->release();
         bullet->setPosition(pos);
         bullet->setVector(vec);
@@ -103,9 +107,8 @@ void BulletController::erase(int i)
     }
     else
     {
-
         bullets.erase(i);
-        b->removeFromParentAndCleanup(false);
+        b->removeFromParentAndCleanup(true);
     }
 }
 
@@ -117,6 +120,7 @@ Vector<AirCraft*> EnemyController::showCaseEnemies;
 Vector<Fodder*> EnemyController::_fodderPool;
 Vector<FodderLeader*> EnemyController::_fodderLPool;
 Vector<BigDude*> EnemyController::_bigDudePool;
+Vector<Boss*> EnemyController::_bossPool;
 
 const float EnemyController::EnemyMoveDist = -400;
 
@@ -174,6 +178,18 @@ AirCraft* EnemyController::createOrGet(int type)
                 enemy->retain();
             }
             break;
+        case kEnemyBoss:
+            if(!_bossPool.empty())
+            {
+                enemy = _bossPool.back();
+                _bossPool.popBack();
+            }
+            else
+            {
+                enemy = Boss::create();
+                enemy->retain();
+            }
+            break;
     }
     return enemy;
 }
@@ -217,6 +233,9 @@ void EnemyController::erase(int i)
         case kEnemyBigDude:
             _bigDudePool.pushBack(static_cast<BigDude*>(e));
             break;
+        case kEnemyBoss:
+            _bossPool.pushBack(static_cast<Boss*>(e));
+            break;
     }
     enemies.erase(i);
     e->removeFromParentAndCleanup(false);
@@ -224,7 +243,7 @@ void EnemyController::erase(int i)
 }
 
 
-void GameController::update(float dt)
+void GameController::update(float dt, Player* player)
 {
     Point temp;
     Bullet* b;
@@ -236,38 +255,54 @@ void GameController::update(float dt)
         temp =b->getPosition();
         if(BOUND_RECT.containsPoint(temp))
         {
-            //********* Enemy Loop **********
-            for(int j = EnemyController::enemies.size()-1; j >= 0; j--)
+            if(b->getOwner() == kPlayer)
             {
-                auto e = EnemyController::enemies.at(j);
-                if(b->getPosition().getDistance(e->getPosition()) <(b->getRadius() + e->getRadius()))
+                //********* Enemy Loop **********
+                for(int j = EnemyController::enemies.size()-1; j >= 0; j--)
                 {
-                    //collision happened
-                    bool dead =  e->hurt(b->getDamage());
-                    if(!dead)
+                    auto e = EnemyController::enemies.at(j);
+                    if(b->getPosition().getDistance(e->getPosition()) <(b->getRadius() + e->getRadius()))
                     {
-                        switch(b->getType())
+                        //collision happened
+                        bool dead =  e->hurt(b->getDamage());
+                        if(!dead)
                         {
-                            case kPlayerMissiles:
-                                EffectManager::createExplosion(e->getPosition());
-                                CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("boom2.mp3");
-                                break;
-                            default:
-                                CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("hit.mp3");
-                                break;
+                            switch(b->getType())
+                            {
+                                case kPlayerMissiles:
+                                    EffectManager::createExplosion(b->getPosition());
+                                
+                                    CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("boom2.mp3");
+                                    break;
+                                default:
+                                    CocosDenshion::SimpleAudioEngine::getInstance()->playEffect("hit.mp3");
+                                    break;
+                            }
                         }
+                        BulletController::erase(i);
                     }
-                    BulletController::erase(i);
-                    break;
+                    
                 }
-
+                //*********** Enemy Loop ***************
+                if(b->getType() == kPlayerMissiles)
+                {
+                    b->update(dt);
+                }
+                else{
+                    b->setPosition(temp+(b->getVector()*dt));
+                }
             }
-            //*********** Enemy Loop ***************
-            if(b->getType() == kPlayerMissiles)
+            // loop all enemy bullets against player
+            else if(b->getPosition().getDistance(player->getPosition()) < b->getRadius()+player->getRadius())
             {
-                b->update(dt);
+                player->hurt(b->getDamage());
+                BulletController::erase(i);
+                EffectManager::createExplosion(player->getPosition());
+                break;
             }
-            else{
+            else // nothing happens to the bullet, move along..
+            {
+                
                 b->setPosition(temp+(b->getVector()*dt));
             }
         }
@@ -289,25 +324,29 @@ void GameController::update(float dt)
         switch(enemy->getType())
         {
             case kEnemyBigDude:
-                enemy->update(dt);
+                static_cast<BigDude*>(enemy)->update(dt, player);
+                break;
+            case kEnemyBoss:
+                static_cast<Boss*>(enemy)->update(dt, player);
                 break;
             default:
                 enemy->move(enemyMoveDist, dt);
                 break;
         }
-        if(!ENEMY_BOUND_RECT.containsPoint(enemy->getPosition()))
+        if(!ENEMY_BOUND_RECT.containsPoint(enemy->getPosition()) && enemy->getType() != kEnemyBoss)
         {
             //enemy went out side, kill it
             EnemyController::erase(k);
         }
+        //if colliding with player
+        else if(enemy->getPosition().getDistance(player->getPosition()) <(enemy->getRadius() + player->getRadius()))
+        {
+            player->hurt(50);
+            enemy->hurt(50);
+            if(enemy->getType() != kEnemyBoss && enemy->getType() != kEnemyBigDude)
+            EnemyController::erase(k);
+        }
         //TODO: if enemy collide with player
         //if(enemy->getPosition().getDistance(<#const cocos2d::Point &other#>))
-    }
-    
-    // enemies that are showing off before they are ready to be shot down
-    for(int u = EnemyController::showCaseEnemies.size()-1; u>=0; u--)
-    {
-        auto enemy =EnemyController::showCaseEnemies.at(u);
-        enemy->move(enemyMoveDist,dt);
     }
 }

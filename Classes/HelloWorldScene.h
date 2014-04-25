@@ -2,7 +2,7 @@
 #define __HELLOWORLD_SCENE_H__
 
 #include "cocos2d.h"
-
+#
 class HelloWorld : public cocos2d::Layer
 {
 public:
@@ -17,6 +17,17 @@ public:
     
     // implement the "static create()" method manually
     CREATE_FUNC(HelloWorld);
+    
+    ~HelloWorld();
+
+    
+private:
+    CC_SYNTHESIZE(cocos2d::ProgressTimer*, hpView, HPView);
+    CC_SYNTHESIZE(int, score, Score)
+    CC_SYNTHESIZE(cocos2d::LabelAtlas*, scoreLabel, ScoreLabel);
+    void increaseScore(float dt);
+    void ShowGameOver(Ref* pObj);
+    
 };
 
 #endif // __HELLOWORLD_SCENE_H__

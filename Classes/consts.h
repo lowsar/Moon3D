@@ -22,11 +22,13 @@ enum entityTypes
 {
     kPlayerBullet,
     kPlayerMissiles,
+    kEnemyBullet,
     
     kPlayer,
     kEnemy,
     
     kEnemyFodder,
     kEnemyFodderL,
-    kEnemyBigDude
+    kEnemyBigDude,
+    kEnemyBoss
 };

@@ -4,6 +4,8 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <cctype>
+
 
 #include "cocos2d.h"
 #include "../cocos2d/cocos/2d/ccMacros.h"
@@ -39,8 +41,8 @@ bool ObjMeshParser::parseComment(std::istream& lineStream, ObjMeshData& meshData
 
 bool ObjMeshParser::parseVertex(std::istream& lineStream, ObjMeshData& meshData)
 {
-    float x,y,z;
-    char whiteSpacex_y,whiteSpacey_z;
+    float x(0),y(0),z(0);
+    char whiteSpacex_y(0),whiteSpacey_z(0);
     lineStream>>x>>whiteSpacex_y>>std::ws>>y>>whiteSpacey_z>>std::ws>>z>>std::ws;
     //check
     if(lineStream.bad() || !lineStream.eof() || !std::isspace(whiteSpacex_y) || !std::isspace(whiteSpacey_z))
@@ -54,9 +56,9 @@ bool ObjMeshParser::parseVertex(std::istream& lineStream, ObjMeshData& meshData)
 
 bool ObjMeshParser::parseTextureVertex(std::istream& lineStream, ObjMeshData& meshData)
 {
-    float u,v;
+    float u(0),v(0);
     float w(0.f);
-    char whiteSpaceu_v;
+    char whiteSpaceu_v(0);
     lineStream>>u>>whiteSpaceu_v>>std::ws>>v>>std::ws;
     if(!lineStream.bad() || !lineStream.eof())
     {
@@ -78,8 +80,8 @@ bool ObjMeshParser::parseTextureVertex(std::istream& lineStream, ObjMeshData& me
 
 bool ObjMeshParser::parseNormal(std::istream& lineStream, ObjMeshData& meshData)
 {
-    float x,y,z;
-    char whiteSpacex_y,whiteSpacey_z;
+    float x(0),y(0),z(0);
+    char whiteSpacex_y(0),whiteSpacey_z(0);
     lineStream>>x>>whiteSpacex_y>>std::ws>>y>>whiteSpacey_z>>std::ws>>z>>std::ws;
     //check
     if(lineStream.bad() || !lineStream.eof() || !std::isspace(whiteSpacex_y) || !std::isspace(whiteSpacey_z))
@@ -103,7 +105,7 @@ bool ObjMeshParser::parseFace(std::istream& lineStream, ObjMeshData& meshData)
         //parse face vertex;
         {
             FaceVertex v(-1,-1,-1);
-            char placeHolder;
+            char placeHolder(0);
             std::stringstream faceVertexStream(faceVertexString);
             faceVertexStream >> v._vIndex;
             if(!faceVertexStream.eof())
@@ -133,7 +135,7 @@ bool ObjMeshParser::parseFace(std::istream& lineStream, ObjMeshData& meshData)
         }
         
         //try read white space
-        char whiteSpace;
+        char whiteSpace(0);
         if(!lineStream.eof())
         {
             lineStream >> whiteSpace >> std::ws;
@@ -318,6 +320,7 @@ void ObjMeshData::trianglarAndGenerateNormals()
     _normalVertexLists.resize(faceVertexNormalList.size());
     for (int index = 0; index < _normalVertexLists.size(); ++index)
     {
+        _normalVertexLists[index] = vec3(0,0,0);
         for (const auto& facenormal : faceVertexNormalList[index])
         {
             _normalVertexLists[index] += facenormal;
@@ -371,9 +374,14 @@ Mesh::Mesh(const string& name)
 : _faceCount(0)
 , _vertexCount(0)
 , _texelCount(0)
+, _vertexBuffer(0)
+, _indexBuffer(0)
+, _indexCount(0)
 {
     _name = FileUtils::getInstance()->fullPathForFilename(name);
     loadFromFile(name);
+    _vertices.clear();
+    _indices.clear();
 //
 //    if (getTexelCount() > 0) {
 //        _texels.resize(getTexelCount());
@@ -444,6 +452,7 @@ Mesh::Mesh(const string& name)
 
 Mesh::~Mesh()
 {
+    freeBuffers();
 }
 
 bool Mesh::loadFromFile(const std::string &name)
@@ -457,6 +466,11 @@ bool Mesh::loadFromFile(const std::string &name)
     parser.parse(objFile, data);
     
     data.convertToRenderMesh(_renderableMesh);
+    
+    generateVertices();
+    generateTriangleIndices();
+    buildBuffer();
+
     return true;
 }
 
@@ -508,15 +522,15 @@ int Mesh::getTriangleIndexCount() const
     return _faceCount * 3;
 }
 
-void Mesh::generateVertices(vector<float>& floats, unsigned char flags) const
+void Mesh::generateVertices()
 {
-    floats.resize(_renderableMesh._vertexs.size() * 8);
-    memcpy(&floats[0], &_renderableMesh._vertexs[0], _renderableMesh._vertexs.size() * 8 * sizeof(float));
+    _vertices.resize(_renderableMesh._vertexs.size() * 8);
+    memcpy(&_vertices[0], &_renderableMesh._vertexs[0], _renderableMesh._vertexs.size() * 8 * sizeof(float));
 }
 
-void Mesh::generateTriangleIndices(vector<unsigned short>& indices) const
+void Mesh::generateTriangleIndices()
 {
-    indices = _renderableMesh._indices;
+    _indices = _renderableMesh._indices;
 //    indices.resize(getTriangleIndexCount());
 //    vector<unsigned short>::iterator index = indices.begin();
 //    for (vector<Face>::const_iterator f = _faces.begin(); f != _faces.end(); ++f) {
@@ -524,4 +538,43 @@ void Mesh::generateTriangleIndices(vector<unsigned short>& indices) const
 //        *index++ = f->face.y;
 //        *index++ = f->face.z;
 //    }
+}
+
+void Mesh::freeBuffers()
+{
+    if(glIsBuffer(_vertexBuffer))
+    {
+        glDeleteBuffers(1, &_vertexBuffer);
+        _vertexBuffer = 0;
+    }
+    if(glIsBuffer(_indexBuffer))
+    {
+        glDeleteBuffers(1, &_indexBuffer);
+        _indexBuffer = 0;
+    }
+    _indexCount = 0;
+}
+
+void Mesh::buildBuffer()
+{
+    freeBuffers();
+
+    glGenBuffers(1, &_vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, _vertexBuffer);
+    glBufferData(GL_ARRAY_BUFFER,
+                 _vertices.size() * sizeof(_vertices[0]),
+                 &_vertices[0],
+                 GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
+    // Create a new VBO for the indices
+    _indexCount = _indices.size();// model->GetTriangleIndexCount();
+
+    glGenBuffers(1, &_indexBuffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 _indexCount * sizeof(GLushort),
+                 &_indices[0],
+                 GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }

@@ -20,6 +20,7 @@ public:
     virtual bool init();
     void update(float dt);
     CREATE_FUNC(GameLayer);
+    static bool isDie;
     //virtual void onEnter();
 protected:
     float xScroll = 0.0f;
@@ -36,6 +37,10 @@ protected:
 
     //QuadTree *container;
     void gameMaster(float dt);
-    float _elapsed = 0;
+    float _elapsed = 20; //testing purpose, this was set to near boss timer
+    bool _bossOut = false;
+    
+private:
+    void removeBulletAndEnmeys(float dt);
 };
 #endif /* defined(__Moon3d__GameLayer__) */

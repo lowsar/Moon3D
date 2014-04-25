@@ -13,16 +13,32 @@
 #include "GameEntity.h"
 #include "GameControllers.h"
 #include "Enemies.h"
+#include "ParticleManager.h"
 
 bool Bullet::init()
 {
-    _Model = Sprite::create("CloseSelected.png");
+    _Model = Sprite::create("bullets.png", Rect(5,8,24,32));
+    //_Model = ParticleSystemQuad::create("missileFlare.plist");
     if(_Model)
     {
         addChild(_Model);
         _radius=10;
-        _type = kPlayerBullet;
+        _type = kEnemyBullet;
+        _owner = kEnemy;
         _damage = 10;
+        
+        auto part_frame=SpriteFrameCache::getInstance()->getSpriteFrameByName("toonFlare.png");
+        ValueMap vm=ParticleManager::getInstance()->GetPlistData("missileFlare");
+        ParticleSystemQuad *p = ParticleSystemQuad::create(vm,part_frame);
+        //p->setEndColor(Color4F(1,0,0,1));
+        //p->setStartColor(Color4F(1,0,0,1));
+        p->setPositionType(tPositionType::GROUPED);
+        p->setScale(2.5);
+        p->setTotalParticles(2);
+        _Model->addChild(p,-1);
+        p->setPosition(Point(_Model->getContentSize()/2));
+        setScale(1.5);
+        //static_cast<Sprite*>(_Model)->setFlippedY(true);
         return true;
     }
     return false;
@@ -35,7 +51,8 @@ bool PlayerBullet::init()
         addChild(_Model);
         _radius=10;
         _type = kPlayerBullet;
-        _damage = 1;
+        _owner = kPlayer;
+        _damage = 2;
         return true;
     }
     return false;
@@ -63,9 +80,10 @@ bool Missile::init()
         addChild(_Model);
         _radius=10;
         _type = kPlayerMissiles;
+        _owner = kPlayer;
         _Model->setScale(3);
         _Model->setRotation3D(Vertex3F(90,0,0));
-        _damage = 75;
+        _damage = 20;
         static_cast<Sprite3D*>(_Model)->setOutline(0.3, Color3B(0,0,0));
         
         _left = (CCRANDOM_MINUS1_1()>0);
@@ -75,14 +93,19 @@ bool Missile::init()
         
         // missile effects
 
-        
-        auto part2 = ParticleSystemQuad::create("emission.plist");
-        addChild(part2);
+        auto part2_frame=SpriteFrameCache::getInstance()->getSpriteFrameByName("toonSmoke.png");
+        ValueMap vm2=ParticleManager::getInstance()->GetPlistData("emission");
+        auto part2 = ParticleSystemQuad::create(vm2,part2_frame);
+        addChild(part2,1);
         part2->setPosition(0,-34);
         part2->setPositionType(tPositionType::GROUPED);
         //part2->setScale(2.5);
-        auto part1 = ParticleSystemQuad::create("missileFlare.plist");
-        addChild(part1);
+        
+        
+        auto part1_frame=SpriteFrameCache::getInstance()->getSpriteFrameByName("toonFlare.png");
+        ValueMap vm1=ParticleManager::getInstance()->GetPlistData("missileFlare");
+        auto part1 = ParticleSystemQuad::create(vm1,part1_frame);
+        addChild(part1,2);
         part1->setPosition(0,-30);
         part1->setPositionType(tPositionType::GROUPED);
         part1->setScale(2.5);
@@ -124,6 +147,9 @@ void Missile::update(float dt)
     // missiles need to rotate
     _yRotation += _yRotSpeed*dt;
     _Model->setRotation3D(Vertex3F(90,_yRotation, 0));
+    
+    
+    
     
     _velocity += _accel*dt;
 }

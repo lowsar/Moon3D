@@ -65,12 +65,16 @@ public:
      This plist files can be created manually or with Particle Designer:
      */
     static ParticleSystemQuad * create(const std::string& filename);
+    
+    static ParticleSystemQuad * create( ValueMap& map);
+    static ParticleSystemQuad * create(ValueMap& map, SpriteFrame *frame);
 
     /** Sets a new SpriteFrame as particle.
     WARNING: this method is experimental. Use setTextureWithRect instead.
     @since v0.99.4
     */
     void setDisplayFrame(SpriteFrame *spriteFrame);
+    
 
     /** Sets a new texture with a rect. The rect is in Points.
      @since v0.99.4
@@ -118,8 +122,8 @@ public:
     virtual void setTotalParticles(int tp) override;
 
     virtual std::string getDescription() const override;
-
-protected:
+    
+CC_CONSTRUCTOR_ACCESS:
     /**
      * @js ctor
      */
@@ -129,10 +133,18 @@ protected:
      * @lua NA
      */
     virtual ~ParticleSystemQuad();
+    
+    // Overrides
+    /**
+     * @js NA
+     * @lua NA
+     */
+    virtual bool initWithTotalParticles(int numberOfParticles) override;
 
+protected:
     /** initializes the indices for the vertices*/
     void initIndices();
-
+    
     /** initializes the texture with a rectangle measured Points */
     void initTexCoordsWithRect(const Rect& rect);
     
@@ -144,8 +156,8 @@ protected:
      * @js NA
      * @lua NA
      */
-    virtual bool initWithTotalParticles(int numberOfParticles) override;
-
+    bool initWithDictionaryAndFrame(ValueMap &dictionary, SpriteFrame* frame);
+    
     void setupVBOandVAO();
     void setupVBO();
     bool allocMemory();

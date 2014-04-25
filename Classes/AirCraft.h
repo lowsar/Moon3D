@@ -16,8 +16,8 @@ USING_NS_CC;
 class AirCraft : public GameEntity
 {
 public:
-    bool hurt(float damage);
-    void die();
+    virtual bool hurt(float damage);
+    virtual void die();
     void shoot();
     //CC_SYNTHESIZE(float, _HP, HP);
     bool alive();
@@ -26,6 +26,7 @@ public:
 protected:
     bool _alive = true;
     float _HP;
+    int _score;
 };
 
 #endif /* defined(__Moon3d__AirCraft__) */

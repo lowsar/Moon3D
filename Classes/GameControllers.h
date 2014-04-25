@@ -17,6 +17,8 @@ class Missile;
 class Fodder;
 class FodderLeader;
 class BigDude;
+class Player;
+class Boss;
 class BulletController
 {
 public:
@@ -27,12 +29,13 @@ public:
     static Vector<Bullet*> bullets;
     static void erase(Bullet* b); //returns the bullet to the pool
     static void erase(int i);
+    
+    static Vector<Missile*> _missilePool;
 
 protected:
         //static BulletController *s_instance;
     static bool _inited;
     static Node *_bulletLayer;
-    static Vector<Missile*> _missilePool;
 };
 
 class EnemyController
@@ -49,20 +52,24 @@ public:
     static Vector<AirCraft*> showCaseEnemies;
 
     static const float EnemyMoveDist;
-protected:
-    static bool _inited;
-    static Node *_enemyLayer;
+    
+    
     //all kinds of enemies container
     static Vector<Fodder*> _fodderPool;
     static Vector<FodderLeader*> _fodderLPool;
     static Vector<BigDude*> _bigDudePool;
+    static Vector<Boss*> _bossPool;
+    
+protected:
+    static bool _inited;
+    static Node *_enemyLayer;
     
 };
 
 class GameController
 {
 public:
-    static void update(float dt);
+    static void update(float dt, Player* player);
 };
 
 #endif /* defined(__Moon3d__BulletController__) */

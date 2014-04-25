@@ -11,10 +11,11 @@
 
 #include "cocos2d.h"
 #define visible_size_macro Director::getInstance()->getVisibleSize()
+#define origin_point Director::getInstance()->getVisibleOrigin();
 class PublicApi
 {
 public:
-    
+    static float hp2percent(float hp);
 protected:
     
 };
